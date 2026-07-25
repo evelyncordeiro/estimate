@@ -151,6 +151,7 @@
   }
   .room-title .eyebrow{margin-bottom:4px;}
   .room-title h1{font-size:21px;margin:0;color:var(--text);}
+  .room-company{font-size:12.5px;color:var(--text-muted);margin:3px 0 0;}
   .room-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
   .share-box{
     display:flex;align-items:center;gap:10px;background:var(--void-2);
@@ -368,6 +369,9 @@
     <h1>Configure a mesa</h1>
     <p class="subtitle">Isso leva menos de um minuto.</p>
 
+    <label>Nome da empresa</label>
+    <input type="text" id="input-company-name" placeholder="Ex: Inspira Valley">
+
     <label>Nome da sala</label>
     <input type="text" id="input-room-name" placeholder="Sprint 3-Q3 — Squad Conversão">
 
@@ -429,6 +433,7 @@
       <div class="room-title">
         <p class="eyebrow">Sala ativa</p>
         <h1 id="sm-room-name">—</h1>
+        <p class="room-company" id="sm-company-line"></p>
       </div>
       <div class="room-actions">
         <div class="share-box">
@@ -499,6 +504,7 @@
   <div class="dev-shell">
     <div class="dev-header">
       <p class="eyebrow" id="dev-room-name">Sala</p>
+      <p class="room-company" id="dev-company-line"></p>
     </div>
     <div class="dev-story-card">
       <div class="tag" id="dev-story-tag">US atual</div>
@@ -626,7 +632,7 @@ function firebaseNotConfigured(){
 let roomRef = null;
 
 const hostState = {
-  roomName:'', scaleKey:'fibonacci', stories:[], currentIndex:-1, adoBase:'',
+  roomName:'', companyName:'', scaleKey:'fibonacci', stories:[], currentIndex:-1, adoBase:'',
   votingOpen:false, revealed:false, participants:[], finalEstimates:{}, roomId:'', voteHistory:{}, roomStartedAt:null
 };
 
@@ -640,14 +646,17 @@ function selectScale(key){
 
 function createRoom(){
   if(firebaseNotConfigured()) return;
+  const company = document.getElementById('input-company-name').value.trim();
   const name = document.getElementById('input-room-name').value.trim();
   const storiesRaw = document.getElementById('input-stories').value;
   const baseUrl = document.getElementById('input-ado-base').value.trim();
+  if(!company){ alert('Informe o nome da empresa.'); return; }
   if(!name){ alert('Dê um nome para a sala.'); return; }
   const lines = storiesRaw.split('\n').map(s=>s.trim()).filter(Boolean);
   if(lines.length===0){ alert('Cole ao menos um ID ou link de US.'); return; }
   const stories = lines.map(l => parseStoryLine(l, baseUrl));
 
+  hostState.companyName = company;
   hostState.roomName = name;
   hostState.stories = stories;
   hostState.adoBase = baseUrl;
@@ -678,6 +687,7 @@ function createRoom(){
   document.getElementById('sm-share-link').dataset.url = url;
   document.getElementById('sm-qr').src = 'https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=' + encodeURIComponent(url);
   document.getElementById('sm-room-name').textContent = hostState.roomName;
+  document.getElementById('sm-company-line').textContent = hostState.companyName;
   if(window.history && window.history.replaceState){
     window.history.replaceState(null, '', location.pathname + '?sm=' + encodeURIComponent(roomId));
   }
@@ -689,6 +699,7 @@ function writeState(){
   if(!roomRef) return;
   roomRef.child('state').set({
     roomName: hostState.roomName,
+    companyName: hostState.companyName,
     scaleKey: hostState.scaleKey,
     stories: hostState.stories,
     currentIndex: hostState.currentIndex,
@@ -720,6 +731,7 @@ function reconnectAsSM(roomId){
     }
     hostState.roomId = roomId;
     hostState.roomName = state.roomName || '';
+    hostState.companyName = state.companyName || '';
     hostState.scaleKey = state.scaleKey || 'fibonacci';
     hostState.stories = state.stories || [];
     hostState.adoBase = state.adoBase || '';
@@ -741,6 +753,7 @@ function reconnectAsSM(roomId){
     document.getElementById('sm-share-link').dataset.url = url;
     document.getElementById('sm-qr').src = 'https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=' + encodeURIComponent(url);
     document.getElementById('sm-room-name').textContent = hostState.roomName;
+    document.getElementById('sm-company-line').textContent = hostState.companyName;
     showView('view-sm-room');
     renderSmRoom();
   }).catch(() => {
@@ -826,7 +839,7 @@ function closeRoom(){
 }
 
 function buildSummaryText(){
-  let lines = ['Sala: ' + hostState.roomName, ''];
+  let lines = ['Empresa: ' + hostState.companyName, 'Sala: ' + hostState.roomName, ''];
   hostState.stories.forEach((s,i) => {
     const est = hostState.finalEstimates[i];
     lines.push('US' + (i+1) + ': ' + s.label + (s.url ? ' — ' + s.url : ''));
@@ -909,12 +922,13 @@ function copyInsights(){
 function startNewRoom(){
   if(roomRef){ try{ roomRef.off(); }catch(e){} roomRef = null; }
 
-  hostState.roomName = ''; hostState.scaleKey = 'fibonacci'; hostState.stories = [];
+  hostState.roomName = ''; hostState.companyName = ''; hostState.scaleKey = 'fibonacci'; hostState.stories = [];
   hostState.adoBase = ''; hostState.voteHistory = {};
   hostState.currentIndex = -1; hostState.votingOpen = false; hostState.revealed = false;
   hostState.participants = []; hostState.finalEstimates = {}; hostState.roomId = ''; hostState.roomStartedAt = null;
   lastState = null; lastParticipants = []; myVote = null; devName = ''; targetRoomId = ''; myParticipantId = null;
 
+  document.getElementById('input-company-name').value = '';
   document.getElementById('input-room-name').value = '';
   document.getElementById('input-stories').value = '';
   document.getElementById('input-ado-base').value = '';
@@ -1161,6 +1175,7 @@ function handleRoomClosedOnDev(){
 function renderDevRoom(){
   if(!lastState) return;
   document.getElementById('dev-room-name').textContent = lastState.roomName;
+  document.getElementById('dev-company-line').textContent = lastState.companyName || '';
 
   const tag = document.getElementById('dev-story-tag');
   const text = document.getElementById('dev-story-text');
