@@ -7,7 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.5/peerjs.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <style>
   :root{
     --void:#f4f6fb;
@@ -551,8 +552,36 @@ function storyLinkHtml(story, buttonText){
 /* ======================================================================
    HOST (SM) STATE + LOGIC
 ====================================================================== */
-let peer = null;
-const connections = new Map(); // peerId -> DataConnection
+/* ======================================================================
+   FIREBASE — cole aqui a configuração do seu projeto (Project settings →
+   General → Your apps → SDK setup and configuration) e configure as regras
+   do Realtime Database como {"rules": {".read": true, ".write": true}}
+====================================================================== */
+const firebaseConfig = {
+  apiKey: "AIzaSyCISh6mzuF45irPaKgWo2U7-VrZtLy7wnc",
+  authDomain: "estimate-evelyn.firebaseapp.com",
+  databaseURL: "https://estimate-evelyn-default-rtdb.firebaseio.com",
+  projectId: "estimate-evelyn",
+  storageBucket: "estimate-evelyn.firebasestorage.app",
+  messagingSenderId: "783960750195",
+  appId: "1:783960750195:web:f8e5296b0d866b5fbed206"
+};
+let db = null;
+try{
+  firebase.initializeApp(firebaseConfig);
+  db = firebase.database();
+}catch(e){
+  console.error('Firebase não configurado corretamente:', e);
+}
+function firebaseNotConfigured(){
+  if(!db || firebaseConfig.apiKey === 'SUBSTITUA_AQUI'){
+    alert('O Firebase ainda não foi configurado neste arquivo. Cole a configuração do seu projeto na constante firebaseConfig, no início do <script>.');
+    return true;
+  }
+  return false;
+}
+
+let roomRef = null;
 
 const hostState = {
   roomName:'', scaleKey:'fibonacci', stories:[], currentIndex:-1, adoBase:'',
@@ -568,6 +597,7 @@ function selectScale(key){
 }
 
 function createRoom(){
+  if(firebaseNotConfigured()) return;
   const name = document.getElementById('input-room-name').value.trim();
   const storiesRaw = document.getElementById('input-stories').value;
   const baseUrl = document.getElementById('input-ado-base').value.trim();
@@ -588,55 +618,30 @@ function createRoom(){
   document.getElementById('btn-create-room').disabled = true;
   document.getElementById('btn-create-room').textContent = 'Criando sala…';
 
-  attemptCreatePeer(slugify(name) + '-' + randId(5));
-}
+  const roomId = slugify(name) + '-' + randId(5);
+  hostState.roomId = roomId;
+  roomRef = db.ref('rooms/' + roomId);
 
-function attemptCreatePeer(roomId){
-  peer = new Peer(roomId);
-  peer.on('connection', conn => {
-    connections.set(conn.peer, conn);
-    conn.on('data', data => handleHostData(conn, data));
-    conn.on('close', () => {
-      hostState.participants = hostState.participants.filter(p=>p.peerId!==conn.peer);
-      connections.delete(conn.peer);
-      broadcastState();
-    });
-  });
-  peer.on('open', id => {
-    hostState.roomId = id;
-    const url = location.origin + location.pathname + '?room=' + encodeURIComponent(id);
-    document.getElementById('sm-share-link').textContent = id;
-    document.getElementById('sm-share-link').dataset.url = url;
-    document.getElementById('sm-qr').src = 'https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=' + encodeURIComponent(url);
-    document.getElementById('sm-room-name').textContent = hostState.roomName;
-    showView('view-sm-room');
+  writeState();
+
+  roomRef.child('participants').on('value', snap => {
+    const val = snap.val() || {};
+    hostState.participants = Object.keys(val).map(pid => Object.assign({peerId:pid}, val[pid]));
     renderSmRoom();
   });
-  peer.on('error', err => {
-    if(err.type === 'unavailable-id'){
-      attemptCreatePeer(slugify(hostState.roomName) + '-' + randId(6));
-    } else {
-      alert('Erro de conexão (' + err.type + '). Verifique sua internet e recarregue a página.');
-    }
-  });
+
+  const url = location.origin + location.pathname + '?room=' + encodeURIComponent(roomId);
+  document.getElementById('sm-share-link').textContent = roomId;
+  document.getElementById('sm-share-link').dataset.url = url;
+  document.getElementById('sm-qr').src = 'https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=' + encodeURIComponent(url);
+  document.getElementById('sm-room-name').textContent = hostState.roomName;
+  showView('view-sm-room');
+  renderSmRoom();
 }
 
-function handleHostData(conn, data){
-  if(data.type === 'join'){
-    const existing = hostState.participants.find(p=>p.peerId===conn.peer);
-    if(!existing){
-      hostState.participants.push({peerId:conn.peer, name:(data.name||'Anônimo').slice(0,24), voted:false, vote:null});
-    }
-    broadcastState();
-  } else if(data.type === 'vote'){
-    if(!hostState.votingOpen || hostState.revealed) return;
-    const p = hostState.participants.find(p=>p.peerId===conn.peer);
-    if(p){ p.voted = true; p.vote = data.value; broadcastState(); }
-  }
-}
-
-function buildClientPayload(){
-  return {
+function writeState(){
+  if(!roomRef) return;
+  roomRef.child('state').set({
     roomName: hostState.roomName,
     scaleKey: hostState.scaleKey,
     stories: hostState.stories,
@@ -644,15 +649,8 @@ function buildClientPayload(){
     votingOpen: hostState.votingOpen,
     revealed: hostState.revealed,
     finalEstimates: hostState.finalEstimates,
-    participants: hostState.participants.map(p => ({
-      name: p.name, voted: p.voted, vote: hostState.revealed ? p.vote : null
-    }))
-  };
-}
-
-function broadcastState(){
-  const payload = {type:'state', state: buildClientPayload()};
-  connections.forEach(conn => { if(conn.open) conn.send(payload); });
+    closed: false
+  });
   renderSmRoom();
 }
 
@@ -668,7 +666,7 @@ function addStories(){
   hostState.stories = hostState.stories.concat(newStories);
   document.getElementById('input-new-stories').value = '';
   document.getElementById('add-story-box').classList.add('hidden');
-  broadcastState();
+  writeState();
 }
 
 function releaseNext(){
@@ -677,7 +675,12 @@ function releaseNext(){
   hostState.participants.forEach(p=>{ p.voted=false; p.vote=null; });
   hostState.votingOpen = true;
   hostState.revealed = false;
-  broadcastState();
+  if(roomRef && hostState.participants.length){
+    const updates = {};
+    hostState.participants.forEach(p => { updates[p.peerId + '/voted'] = false; updates[p.peerId + '/vote'] = null; });
+    roomRef.child('participants').update(updates);
+  }
+  writeState();
 }
 
 function revealVotes(){
@@ -688,12 +691,12 @@ function revealVotes(){
     storyLabel: hostState.stories[hostState.currentIndex] ? hostState.stories[hostState.currentIndex].label : ('US' + (hostState.currentIndex+1)),
     votes: hostState.participants.map(p => ({ name:p.name, vote:p.vote }))
   };
-  broadcastState();
+  writeState();
 }
 
 function setFinalEstimate(index, value){
   hostState.finalEstimates[index] = value;
-  broadcastState();
+  writeState();
 }
 
 function confirmCloseRoom(){
@@ -702,8 +705,10 @@ function confirmCloseRoom(){
   }
 }
 function closeRoom(){
-  connections.forEach(conn => { if(conn.open) conn.send({type:'closed'}); });
-  setTimeout(()=>{ if(peer) peer.destroy(); }, 300);
+  if(roomRef){
+    roomRef.child('state/closed').set(true);
+    roomRef.child('participants').off();
+  }
   document.getElementById('closed-message').textContent = 'Você encerrou a sala "' + hostState.roomName + '".';
   const hasEstimates = Object.keys(hostState.finalEstimates).length > 0 || hostState.currentIndex >= 0;
   document.getElementById('closed-summary-wrap').classList.toggle('hidden', !hasEstimates);
@@ -800,15 +805,13 @@ function copyInsights(){
 }
 
 function startNewRoom(){
-  if(peer){ try{ peer.destroy(); }catch(e){} peer = null; }
-  if(devPeer){ try{ devPeer.destroy(); }catch(e){} devPeer = null; devConn = null; }
-  connections.clear();
+  if(roomRef){ try{ roomRef.off(); }catch(e){} roomRef = null; }
 
   hostState.roomName = ''; hostState.scaleKey = 'fibonacci'; hostState.stories = [];
   hostState.adoBase = ''; hostState.voteHistory = {};
   hostState.currentIndex = -1; hostState.votingOpen = false; hostState.revealed = false;
   hostState.participants = []; hostState.finalEstimates = {}; hostState.roomId = '';
-  lastState = null; myVote = null; devName = ''; targetRoomId = '';
+  lastState = null; lastParticipants = []; myVote = null; devName = ''; targetRoomId = ''; myParticipantId = null;
 
   document.getElementById('input-room-name').value = '';
   document.getElementById('input-stories').value = '';
@@ -972,9 +975,9 @@ function buildRevealPanelHtml(participants, currentIndex, finalEstimates, isHost
 /* ======================================================================
    DEV (participant) STATE + LOGIC
 ====================================================================== */
-let devPeer = null, devConn = null;
-let devName = '', targetRoomId = '', myVote = null;
+let devName = '', targetRoomId = '', myVote = null, myParticipantId = null;
 let lastState = null;
+let lastParticipants = [];
 
 function showManualJoin(){
   document.getElementById('manual-join-box').classList.remove('hidden');
@@ -991,32 +994,40 @@ function startLinkJoin(){
   joinRoom(targetRoomId, name);
 }
 
+function applyStateUpdate(newState){
+  if(newState === null || newState.closed){ handleRoomClosedOnDev(); return; }
+  lastState = Object.assign({}, newState, {participants: lastParticipants});
+  renderDevRoom();
+}
+function applyParticipantsUpdate(participantsObj){
+  const val = participantsObj || {};
+  lastParticipants = Object.keys(val).map(pid => Object.assign({peerId:pid}, val[pid]));
+  if(lastState){ lastState.participants = lastParticipants; renderDevRoom(); }
+}
+
 function joinRoom(roomId, name){
+  if(firebaseNotConfigured()) return;
   devName = name; targetRoomId = roomId;
   document.getElementById('dev-room-name').textContent = 'Conectando…';
   showView('view-dev-room');
 
-  devPeer = new Peer();
-  devPeer.on('open', () => {
-    devConn = devPeer.connect(roomId, {reliable:true});
-    devConn.on('open', () => devConn.send({type:'join', name:devName}));
-    devConn.on('data', data => {
-      if(data.type === 'state'){ lastState = data.state; renderDevRoom(); }
-      else if(data.type === 'closed'){ handleRoomClosedOnDev(); }
+  myParticipantId = 'p' + randId(12);
+  roomRef = db.ref('rooms/' + roomId);
+
+  roomRef.child('participants/' + myParticipantId).set({name: devName, voted:false, vote:null})
+    .catch(() => {
+      document.getElementById('dev-status').textContent = 'Não foi possível conectar. Confira o link/código e tente novamente.';
     });
-    devConn.on('close', () => {
-      document.getElementById('dev-status').textContent = 'Conexão com a sala foi perdida. Peça um novo link ao Scrum Master.';
-    });
-  });
-  devPeer.on('error', err => {
-    document.getElementById('dev-status').textContent = 'Não foi possível conectar (' + err.type + '). Confira o link/código e tente novamente.';
-  });
+  roomRef.child('participants/' + myParticipantId).onDisconnect().remove();
+
+  roomRef.child('state').on('value', snap => applyStateUpdate(snap.val()));
+  roomRef.child('participants').on('value', snap => applyParticipantsUpdate(snap.val()));
 }
 
 function castVote(value){
-  if(!devConn || !devConn.open || !lastState || !lastState.votingOpen || lastState.revealed) return;
+  if(!lastState || !lastState.votingOpen || lastState.revealed || !myParticipantId || !roomRef) return;
   myVote = value;
-  devConn.send({type:'vote', value});
+  roomRef.child('participants/' + myParticipantId).update({voted:true, vote:value});
   renderDevRoom();
 }
 
