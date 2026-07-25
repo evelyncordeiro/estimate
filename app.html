@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Estimate — Mesa de Estimativa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.5/peerjs.min.js"></script>
+<style>
+  :root{
+    --void:#f4f6fb;
+    --void-2:#ffffff;
+    --card-cream:#ffffff;
+    --card-ink:#14162b;
+    --card-ink-muted:#6b7094;
+    --card-line:#e7e9f5;
+    --gold:#4548d4;
+    --gold-bright:#5457eb;
+    --ruby:#14162b;
+    --ruby-bright:#2a2d4a;
+    --text:#14162b;
+    --text-muted:#6b7094;
+    --line:#e7e9f5;
+    --success-bg:#dcf5e3;
+    --success-fg:#189a4b;
+    --warn-bg:#fdecd6;
+    --warn-fg:#c9740f;
+    --radius:16px;
+  }
+  *,*::before,*::after{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--void);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,.display{font-family:'Inter',sans-serif;font-weight:800;}
+  .mono{font-family:'Inter',sans-serif;}
+  button{font-family:inherit;cursor:pointer;}
+  input,textarea,select{font-family:inherit;}
+  .hidden{display:none !important;}
+  a{color:var(--gold-bright);}
+
+  .logo-row{display:flex;align-items:center;gap:10px;margin-bottom:22px;}
+  .logo-mark{width:34px;height:34px;border-radius:10px;background:var(--gold-bright);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:15px;flex-shrink:0;}
+  .logo-word{font-size:17px;font-weight:800;color:var(--card-ink);}
+  .logo-word span{color:var(--gold-bright);}
+
+  /* ---------- layout shells ---------- */
+  .screen{
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:32px 20px;
+  }
+  .panel{
+    width:100%;
+    max-width:520px;
+    background:var(--void-2);
+    border:1px solid var(--line);
+    border-radius:20px;
+    padding:36px 32px;
+    box-shadow:0 1px 2px rgba(20,22,43,0.04), 0 20px 40px -28px rgba(20,22,43,0.18);
+  }
+  .eyebrow{
+    text-transform:uppercase;
+    letter-spacing:0.14em;
+    font-size:11.5px;
+    color:var(--gold-bright);
+    font-weight:700;
+    margin:0 0 10px;
+  }
+  .panel h1{font-size:26px;margin:0 0 6px;font-weight:800;line-height:1.2;}
+  .subtitle{color:var(--text-muted);font-size:14.5px;margin:0 0 28px;line-height:1.5;}
+  label{display:block;font-size:12.5px;color:var(--text-muted);margin:18px 0 6px;font-weight:600;letter-spacing:0.02em;}
+  label:first-of-type{margin-top:0;}
+  input[type=text], textarea{
+    width:100%;
+    background:var(--void);
+    border:1px solid var(--line);
+    color:var(--text);
+    border-radius:10px;
+    padding:12px 14px;
+    font-size:14.5px;
+    outline-offset:2px;
+    transition:border-color .15s, box-shadow .15s;
+  }
+  input[type=text]:focus, textarea:focus{border-color:var(--gold-bright);box-shadow:0 0 0 3px rgba(84,87,235,0.16);outline:none;}
+  textarea{resize:vertical;min-height:120px;line-height:1.6;}
+  .hint{font-size:12px;color:var(--text-muted);margin-top:6px;}
+
+  .scale-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;}
+  .scale-opt{
+    border:1px solid var(--line);background:var(--void);
+    border-radius:10px;padding:10px 12px;text-align:left;color:var(--text);
+    transition:border-color .15s, background .15s;
+  }
+  .scale-opt strong{display:block;font-size:13px;margin-bottom:2px;}
+  .scale-opt span{font-size:11.5px;color:var(--text-muted);}
+  .scale-opt.active{border-color:var(--gold-bright);background:rgba(84,87,235,0.08);}
+
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    border:none;border-radius:10px;padding:13px 22px;font-size:14.5px;font-weight:700;
+    transition:transform .1s ease, filter .15s ease, background .15s ease;
+  }
+  .btn:active{transform:scale(0.98);}
+  .btn-primary{background:var(--gold-bright);color:#ffffff;width:100%;margin-top:26px;}
+  .btn-primary:hover{background:var(--gold);}
+  .btn-primary:disabled{opacity:.4;cursor:not-allowed;filter:none;}
+  .btn-ghost{background:#ffffff;border:1px solid var(--line);color:var(--text);}
+  .btn-ghost:hover{border-color:var(--gold-bright);}
+  .btn-ruby{background:linear-gradient(180deg,var(--ruby-bright),var(--ruby));color:#ffffff;}
+  .btn-small{padding:8px 14px;font-size:13px;}
+  .link-row{display:flex;flex-direction:column;align-items:center;gap:2px;margin:20px 0 8px;cursor:pointer;}
+  .link-row span{font-size:13px;color:var(--gold-bright);text-decoration:underline;}
+
+  /* ---------- landing choice cards ---------- */
+  .choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:24px;}
+  @media(max-width:480px){.choice-grid{grid-template-columns:1fr;}}
+  .choice-card{
+    border:1px solid var(--line);border-radius:14px;padding:20px;background:var(--void);
+    text-align:left;color:var(--text);transition:border-color .15s, transform .1s;
+  }
+  .choice-card:hover{border-color:var(--gold-bright);transform:translateY(-2px);}
+  .choice-card .suit{font-size:24px;margin-bottom:10px;display:block;color:var(--gold-bright);}
+  .choice-card strong{display:block;font-size:15px;margin-bottom:4px;}
+  .choice-card span{font-size:12.5px;color:var(--text-muted);line-height:1.4;display:block;}
+
+  /* ---------- SM room ---------- */
+  #view-sm-room, #view-dev-room{align-items:flex-start;padding:0;min-height:100vh;display:flex;}
+  .room-shell{width:100%;max-width:1180px;margin:0 auto;padding:22px 20px 60px;}
+  .room-topbar{
+    display:flex;justify-content:space-between;align-items:flex-start;gap:16px;
+    flex-wrap:wrap;margin-bottom:22px;
+  }
+  .room-title .eyebrow{margin-bottom:4px;}
+  .room-title h1{font-size:21px;margin:0;color:var(--text);}
+  .room-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  .share-box{
+    display:flex;align-items:center;gap:10px;background:var(--void-2);
+    border:1px solid var(--line);border-radius:12px;padding:8px 8px 8px 14px;
+    box-shadow:0 1px 2px rgba(20,22,43,0.04);
+  }
+  .share-box code{font-size:12.5px;color:var(--gold-bright);font-weight:700;}
+  .share-box img{border-radius:6px;display:block;}
+
+  .room-grid{display:grid;grid-template-columns:260px 1fr;gap:22px;}
+  @media(max-width:880px){.room-grid{grid-template-columns:1fr;}}
+
+  .stories-side{
+    background:var(--void-2);border:1px solid var(--line);border-radius:16px;
+    padding:16px;max-height:640px;overflow:auto;
+  }
+  .stories-side h3{font-size:12.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin:0 0 12px;}
+  .stories-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+  .stories-head h3{margin:0;}
+  .add-story-box{margin-bottom:16px;padding:12px;background:var(--void);border:1px solid var(--line);border-radius:10px;}
+  .add-story-box textarea{min-height:64px;font-size:13px;}
+  .story-item{
+    display:flex;gap:10px;padding:10px 8px;border-radius:8px;font-size:13px;line-height:1.4;
+    border-left:3px solid transparent;color:var(--text-muted);
+  }
+  .story-item .num{font-size:11.5px;color:var(--text-muted);flex-shrink:0;padding-top:1px;}
+  .story-item.current{background:rgba(84,87,235,0.08);border-left-color:var(--gold-bright);color:var(--text);font-weight:600;}
+  .story-item.done{color:var(--text-muted);}
+  .story-item.done .num::after{content:" ✓";color:var(--success-fg);}
+  .story-item .est-input{
+    margin-left:auto;font-size:11px;font-weight:700;color:var(--gold-bright);
+    background:var(--void);border:1px solid var(--line);padding:2px 4px;border-radius:5px;
+    flex-shrink:0;width:46px;text-align:center;transition:border-color .15s, background .15s;
+  }
+  .story-item .est-input:focus{outline:none;border-color:var(--gold-bright);background:#ffffff;}
+  .story-item .est-input::placeholder{color:var(--text-muted);opacity:0.6;}
+
+  .table-wrap{
+    background:var(--void-2);
+    border:1px solid var(--line);
+    border-radius:20px;
+    padding:26px 22px 34px;
+    position:relative;
+    min-height:520px;
+    box-shadow:0 1px 2px rgba(20,22,43,0.04);
+  }
+  .table-oval{
+    position:relative;
+    width:100%;
+    aspect-ratio:16/10;
+    max-height:340px;
+    margin:10px auto 0;
+    border:1px dashed var(--line);
+    border-radius:50%;
+  }
+  .center-card{
+    position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    width:min(78%, 360px);
+    background:var(--void);color:var(--card-ink);
+    border:1px solid var(--line);
+    border-radius:12px;padding:16px 18px;text-align:center;
+  }
+  .center-card .tag{font-size:11px;letter-spacing:.06em;color:var(--card-ink-muted);text-transform:uppercase;font-weight:700;}
+  .center-card p{margin:8px 0 0;font-size:14.5px;line-height:1.45;font-weight:600;max-height:110px;overflow:auto;}
+  .center-card.waiting{color:var(--card-ink-muted);font-style:italic;}
+  .story-link{
+    display:inline-block;margin-top:12px;font-size:12.5px;font-weight:700;
+    color:var(--gold);text-decoration:none;border:1px solid var(--line);
+    border-radius:20px;padding:5px 14px;transition:border-color .15s, background .15s;
+  }
+  .story-link:hover{border-color:var(--gold-bright);background:rgba(84,87,235,0.06);}
+
+  .seat{
+    position:absolute;transform:translate(-50%,-50%);
+    display:flex;flex-direction:column;align-items:center;gap:5px;
+    width:76px;
+  }
+  .seat-card{
+    width:52px;height:64px;border-radius:8px;
+    display:flex;align-items:center;justify-content:center;text-align:center;padding:3px;
+    font-weight:800;font-size:13px;line-height:1.1;white-space:normal;word-break:break-word;
+    background:var(--void);
+    border:1px solid var(--line);color:var(--text-muted);
+    transition:transform .4s ease, background .3s ease, color .3s ease, box-shadow .3s ease;
+  }
+  .seat.seat-voted .seat-card{background:var(--success-bg);border-color:var(--success-fg);color:var(--success-fg);}
+  .seat.seat-revealed .seat-card{
+    background:var(--gold-bright);color:#ffffff;border-color:var(--gold-bright);
+    transform:rotateY(360deg);
+  }
+  .seat-name{font-size:11px;color:var(--text-muted);text-align:center;line-height:1.2;max-width:76px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .seat.seat-revealed .seat-name, .seat.seat-voted .seat-name{color:var(--text);}
+  .empty-table-msg{
+    position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    color:var(--text-muted);font-size:13px;text-align:center;width:200px;
+  }
+
+  .table-footer{display:flex;justify-content:space-between;align-items:center;margin-top:24px;flex-wrap:wrap;gap:14px;}
+  .vote-count{font-size:12.5px;color:var(--text-muted);}
+  .vote-count strong{color:var(--gold-bright);}
+
+  .reveal-panel{
+    margin-top:20px;background:var(--void);border:1px solid var(--line);
+    border-radius:14px;padding:18px 20px;
+  }
+  .reveal-panel h4{margin:0 0 12px;font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);}
+  .histogram{display:flex;gap:10px;align-items:flex-end;height:110px;margin-bottom:16px;}
+  .hist-bar{display:flex;flex-direction:column;align-items:center;gap:6px;flex:1;min-width:0;}
+  .hist-bar .bar{
+    width:100%;max-width:40px;background:var(--gold-bright);
+    border-radius:6px 6px 0 0;
+  }
+  .hist-bar .val{font-size:12px;font-weight:700;color:var(--text);}
+  .hist-bar .cnt{font-size:11px;color:var(--text-muted);}
+  .stats-row{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--text-muted);margin-bottom:14px;}
+  .stats-row b{color:var(--text);}
+  .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11.5px;font-weight:700;}
+  .badge-ok{background:var(--success-bg);color:var(--success-fg);}
+  .badge-warn{background:var(--warn-bg);color:var(--warn-fg);}
+  .final-est-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  .final-est-row input{width:100px;}
+  .votes-list{margin-top:14px;display:flex;flex-wrap:wrap;gap:8px;}
+  .vote-chip{
+    font-size:12px;background:var(--void-2);border:1px solid var(--line);
+    border-radius:20px;padding:4px 12px;color:var(--text-muted);
+  }
+  .vote-chip b{color:var(--gold-bright);margin-left:4px;}
+
+  /* ---------- dev room ---------- */
+  .dev-shell{width:100%;max-width:520px;margin:0 auto;padding:24px 18px 40px;min-height:100vh;display:flex;flex-direction:column;}
+  .dev-header{text-align:center;margin-bottom:18px;}
+  .dev-header .eyebrow{margin-bottom:6px;}
+  .dev-story-card{
+    background:var(--void-2);color:var(--card-ink);border-radius:14px;border:1px solid var(--line);
+    padding:22px 20px;text-align:center;box-shadow:0 1px 2px rgba(20,22,43,0.04);margin-bottom:22px;
+  }
+  .dev-story-card .tag{font-size:11px;color:var(--card-ink-muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;}
+  .dev-story-card p{margin:10px 0 0;font-size:16px;font-weight:600;line-height:1.5;}
+  .dev-status{text-align:center;color:var(--text-muted);font-size:13.5px;margin-bottom:18px;min-height:20px;}
+  .hand{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:auto;}
+  .poker-card{
+    width:66px;height:86px;border-radius:10px;border:1px solid var(--line);
+    background:var(--void-2);color:var(--text);
+    font-size:14px;font-weight:800;line-height:1.15;white-space:normal;word-break:break-word;
+    display:flex;align-items:center;justify-content:center;text-align:center;padding:5px;
+    box-shadow:0 1px 2px rgba(20,22,43,0.04);
+    transition:transform .12s ease, background .15s, border-color .15s, color .15s;
+  }
+  .poker-card:hover{transform:translateY(-6px);border-color:var(--gold-bright);}
+  .poker-card.selected{background:var(--gold-bright);color:#ffffff;border-color:var(--gold-bright);transform:translateY(-8px);}
+  .poker-card:disabled{opacity:.35;cursor:not-allowed;transform:none;}
+
+  .participants-mini{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:16px;}
+  .pchip{font-size:11.5px;background:var(--void-2);border:1px solid var(--line);border-radius:20px;padding:3px 10px;color:var(--text-muted);}
+  .pchip.voted{background:var(--success-bg);color:var(--success-fg);border-color:var(--success-fg);font-weight:700;}
+
+  /* ---------- closed ---------- */
+  .summary-box{background:var(--void);border:1px solid var(--line);border-radius:10px;padding:14px;max-height:300px;overflow:auto;font-family:'Inter',sans-serif;font-size:12.5px;white-space:pre-wrap;color:var(--text-muted);margin-top:16px;line-height:1.6;}
+
+  @media (prefers-reduced-motion: reduce){
+    *{transition:none !important;animation:none !important;}
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ LANDING ============ -->
+<div id="view-landing" class="view screen">
+  <div class="panel">
+    <div class="logo-row"><div class="logo-mark">E</div><div class="logo-word">Estimat<span>e</span></div></div>
+    <p class="eyebrow">Estimativa colaborativa</p>
+    <h1>Sem cadastro, sem instalar nada</h1>
+    <p class="subtitle">Crie uma sala para o seu squad estimar as User Stories da sprint, ou entre em uma sala já existente com o link recebido.</p>
+    <div class="choice-grid">
+      <button class="choice-card" onclick="showView('view-create')">
+        <span class="suit">♠</span>
+        <strong>Criar sala</strong>
+        <span>Você é o Scrum Master. Configure a escala, cole as US e comece.</span>
+      </button>
+      <button class="choice-card" onclick="showManualJoin()">
+        <span class="suit">♦</span>
+        <strong>Entrar com código</strong>
+        <span>Recebeu o código da sala em vez do link? Digite aqui.</span>
+      </button>
+    </div>
+    <div id="manual-join-box" class="hidden" style="margin-top:22px;">
+      <label>Código da sala</label>
+      <input type="text" id="manual-room-code" placeholder="ex: sprint3-q3-squad-conversao-8f2a">
+      <label>Seu nome</label>
+      <input type="text" id="manual-dev-name" placeholder="Como o SM vai te ver na mesa">
+      <button class="btn btn-primary" onclick="startManualJoin()">Entrar na sala</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ CREATE ROOM ============ -->
+<div id="view-create" class="view screen hidden">
+  <div class="panel">
+    <p class="eyebrow">Nova sala</p>
+    <h1>Configure a mesa</h1>
+    <p class="subtitle">Isso leva menos de um minuto.</p>
+
+    <label>Nome da sala</label>
+    <input type="text" id="input-room-name" placeholder="Sprint 3-Q3 — Squad Conversão">
+
+    <label>Escala de estimativa</label>
+    <div class="scale-grid">
+      <button class="scale-opt active" id="opt-fibonacci" onclick="selectScale('fibonacci')">
+        <strong>Fibonacci</strong><span>0,1,2,3,5,8,13,21</span>
+      </button>
+      <button class="scale-opt" id="opt-sequencial" onclick="selectScale('sequencial')">
+        <strong>Sequencial</strong><span>1 a 10</span>
+      </button>
+      <button class="scale-opt" id="opt-tshirt" onclick="selectScale('tshirt')">
+        <strong>T-shirt size</strong><span>PP, P, M, G, GG</span>
+      </button>
+      <button class="scale-opt" id="opt-cores" onclick="selectScale('cores')">
+        <strong>Cores</strong><span>Verde a Marrom</span>
+      </button>
+      <button class="scale-opt" id="opt-horas" onclick="selectScale('horas')">
+        <strong>Horas úteis</strong><span>0,5h a 40h</span>
+      </button>
+      <button class="scale-opt" id="opt-dias" onclick="selectScale('dias')">
+        <strong>Dias úteis</strong><span>0,5d a 7d</span>
+      </button>
+      <button class="scale-opt" id="opt-vibe" onclick="selectScale('vibe')">
+        <strong>Vibe Points</strong><span>1, 3, 9, 27</span>
+      </button>
+    </div>
+
+    <label>Itens de trabalho — ID ou nome/título (um por linha, na ordem da votação)</label>
+    <textarea id="input-stories" placeholder="1234&#10;Reduzir abandono no carrinho"></textarea>
+    <p class="hint">Pode colar o número do item, o título da história, ou o link completo — o que vier em cada linha.</p>
+
+    <label>Link base do seu board (opcional)</label>
+    <input type="text" id="input-ado-base" placeholder="https://dev.azure.com/suaorg/seuprojeto/_workitems/edit/">
+    <p class="hint">Preenchendo isso, os IDs digitados sozinhos (sem link) também viram clicáveis. Linhas que já são um link completo funcionam de qualquer jeito.</p>
+
+    <button class="btn btn-primary" id="btn-create-room" onclick="createRoom()">Criar sala e gerar link</button>
+    <button class="btn btn-ghost" style="width:100%;margin-top:10px;" onclick="showView('view-landing')">Voltar</button>
+  </div>
+</div>
+
+<!-- ============ JOIN (name entry via link) ============ -->
+<div id="view-join" class="view screen hidden">
+  <div class="panel">
+    <p class="eyebrow">Você foi convidado</p>
+    <h1 id="join-room-label">Entrar na sala</h1>
+    <p class="subtitle">Digite seu nome para se sentar à mesa. Sem senha, sem cadastro.</p>
+    <label>Seu nome</label>
+    <input type="text" id="input-dev-name" placeholder="Como o SM vai te ver na mesa">
+    <button class="btn btn-primary" id="btn-join-room" onclick="startLinkJoin()">Entrar na sala</button>
+    <p id="join-error" class="hint" style="color:var(--ruby-bright);"></p>
+  </div>
+</div>
+
+<!-- ============ SM ROOM ============ -->
+<div id="view-sm-room" class="view hidden">
+  <div class="room-shell">
+    <div class="room-topbar">
+      <div class="room-title">
+        <p class="eyebrow">Sala ativa</p>
+        <h1 id="sm-room-name">—</h1>
+      </div>
+      <div class="room-actions">
+        <div class="share-box">
+          <div>
+            <div class="hint" style="margin:0 0 2px;">Link para os devs</div>
+            <code id="sm-share-link">—</code>
+          </div>
+          <button class="btn btn-ghost btn-small" onclick="copyShareLink()">Copiar</button>
+          <img id="sm-qr" src="" width="64" height="64" alt="QR code da sala">
+        </div>
+        <button class="btn btn-ruby btn-small" onclick="confirmCloseRoom()">Encerrar sala</button>
+      </div>
+    </div>
+
+    <div class="room-grid">
+      <aside class="stories-side">
+        <div class="stories-head">
+          <h3>User Stories</h3>
+          <button class="btn btn-ghost btn-small" onclick="toggleAddStoryBox()">+ Adicionar</button>
+        </div>
+        <div id="add-story-box" class="add-story-box hidden">
+          <textarea id="input-new-stories" placeholder="1237&#10;https://dev.azure.com/suaorg/seuprojeto/_workitems/edit/1238"></textarea>
+          <button class="btn btn-primary btn-small" style="width:100%;margin-top:8px;" onclick="addStories()">Adicionar à sala</button>
+        </div>
+        <div id="stories-list"></div>
+      </aside>
+
+      <section>
+        <div class="table-wrap">
+          <div class="table-oval" id="table-oval">
+            <div id="table-seats"></div>
+            <div id="center-card" class="center-card waiting"><p>Aguardando início</p></div>
+          </div>
+          <div class="table-footer">
+            <div class="vote-count" id="vote-count"></div>
+            <div style="display:flex;gap:10px;">
+              <button class="btn btn-ghost" id="btn-reveal" onclick="revealVotes()" disabled>Revelar votos</button>
+              <button class="btn btn-primary" style="margin-top:0;" id="btn-next" onclick="releaseNext()">Liberar votação — US 1</button>
+            </div>
+          </div>
+          <div id="reveal-panel" class="reveal-panel hidden"></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<!-- ============ DEV ROOM ============ -->
+<div id="view-dev-room" class="view hidden">
+  <div class="dev-shell">
+    <div class="dev-header">
+      <p class="eyebrow" id="dev-room-name">Sala</p>
+    </div>
+    <div class="dev-story-card">
+      <div class="tag" id="dev-story-tag">US atual</div>
+      <p id="dev-story-text">Aguardando o Scrum Master liberar a votação…</p>
+    </div>
+    <div class="dev-status" id="dev-status"></div>
+    <div id="dev-reveal-panel"></div>
+    <div class="hand" id="dev-hand"></div>
+    <div class="participants-mini" id="dev-participants"></div>
+  </div>
+</div>
+
+<!-- ============ CLOSED ============ -->
+<div id="view-closed" class="view screen hidden">
+  <div class="panel">
+    <p class="eyebrow">Sessão encerrada</p>
+    <h1>Boa sprint pra vocês 🂡</h1>
+    <p class="subtitle" id="closed-message">A sala foi encerrada.</p>
+    <div id="closed-summary-wrap" class="hidden">
+      <button class="btn btn-ghost" style="width:100%;" onclick="copySummary()">Copiar resumo das estimativas</button>
+      <div class="summary-box" id="summary-box"></div>
+    </div>
+    <div id="closed-insights-wrap" class="hidden" style="margin-top:18px;">
+      <button class="btn btn-ghost" style="width:100%;" onclick="copyInsights()">Copiar insights da sessão</button>
+      <div class="summary-box" id="insights-box"></div>
+    </div>
+    <button class="btn btn-primary" style="margin-top:18px;" onclick="startNewRoom()">Criar nova sala</button>
+  </div>
+</div>
+
+<script>
+/* ======================================================================
+   UTILITIES
+====================================================================== */
+function range(start, end){
+  const arr = [];
+  for(let i = start; i <= end; i++) arr.push(String(i));
+  return arr;
+}
+const HORAS_ORDER = ['0,5h'].concat(range(1,40).map(n => n + 'h'));
+const DIAS_ORDER = ['0,5d'].concat(range(1,7).map(n => n + 'd'));
+
+const SCALES = {
+  fibonacci: { order:['0','1','2','3','5','8','13','21'], deck:['0','1','2','3','5','8','13','21','☕','?'] },
+  sequencial: { order:range(1,10), deck:range(1,10).concat(['☕','?']) },
+  tshirt: { order:['PP','P','M','G','GG'], deck:['PP','P','M','G','GG','☕','?'] },
+  cores: { order:['Verde','Amarelo','Laranja','Vermelho','Marrom'], deck:['Verde','Amarelo','Laranja','Vermelho','Marrom','☕','?'] },
+  horas: { order:HORAS_ORDER, deck:HORAS_ORDER.concat(['☕','?']) },
+  dias: { order:DIAS_ORDER, deck:DIAS_ORDER.concat(['☕','?']) },
+  vibe: { order:['1','3','9','27'], deck:['1','3','9','27','☕','?'] }
+};
+const SCALE_LABELS = {
+  fibonacci:'Fibonacci', sequencial:'Sequencial', tshirt:'T-shirt size',
+  cores:'Cores', horas:'Horas úteis', dias:'Dias úteis', vibe:'Vibe Points'
+};
+
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function slugify(str){
+  const base = (str||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-+|-+$)/g,'').slice(0,26);
+  return base || 'sala';
+}
+function randId(len){
+  return Math.random().toString(36).slice(2, 2+len);
+}
+function isNumericVote(v){ return v!==null && v!==undefined && v!=='' && !isNaN(Number(v)); }
+function showView(id){
+  document.querySelectorAll('.view').forEach(v=>v.classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+}
+function parseStoryLine(raw, baseUrl){
+  const t = raw.trim();
+  if(/^https?:\/\//i.test(t)){
+    const m = t.match(/(\d+)(?:[/?#]|$)/);
+    const id = m ? m[1] : null;
+    return {id, url:t, label: id ? ('US #'+id) : t};
+  }
+  if(/^\d+$/.test(t)){
+    let url = null;
+    if(baseUrl){ url = baseUrl.trim().replace(/\/+$/,'') + '/' + t; }
+    return {id:t, url, label:'US #'+t};
+  }
+  return {id:null, url:null, label:t};
+}
+function storyLinkHtml(story, buttonText){
+  return story.url
+    ? `<a class="story-link" href="${escapeHtml(story.url)}" target="_blank" rel="noopener">${escapeHtml(buttonText)} ↗</a>`
+    : '';
+}
+
+/* ======================================================================
+   HOST (SM) STATE + LOGIC
+====================================================================== */
+let peer = null;
+const connections = new Map(); // peerId -> DataConnection
+
+const hostState = {
+  roomName:'', scaleKey:'fibonacci', stories:[], currentIndex:-1, adoBase:'',
+  votingOpen:false, revealed:false, participants:[], finalEstimates:{}, roomId:'', voteHistory:{}
+};
+
+function selectScale(key){
+  hostState.scaleKey = key;
+  Object.keys(SCALES).forEach(k => {
+    const el = document.getElementById('opt-' + k);
+    if(el) el.classList.toggle('active', k === key);
+  });
+}
+
+function createRoom(){
+  const name = document.getElementById('input-room-name').value.trim();
+  const storiesRaw = document.getElementById('input-stories').value;
+  const baseUrl = document.getElementById('input-ado-base').value.trim();
+  if(!name){ alert('Dê um nome para a sala.'); return; }
+  const lines = storiesRaw.split('\n').map(s=>s.trim()).filter(Boolean);
+  if(lines.length===0){ alert('Cole ao menos um ID ou link de US.'); return; }
+  const stories = lines.map(l => parseStoryLine(l, baseUrl));
+
+  hostState.roomName = name;
+  hostState.stories = stories;
+  hostState.adoBase = baseUrl;
+  hostState.currentIndex = -1;
+  hostState.votingOpen = false;
+  hostState.revealed = false;
+  hostState.participants = [];
+  hostState.finalEstimates = {};
+
+  document.getElementById('btn-create-room').disabled = true;
+  document.getElementById('btn-create-room').textContent = 'Criando sala…';
+
+  attemptCreatePeer(slugify(name) + '-' + randId(5));
+}
+
+function attemptCreatePeer(roomId){
+  peer = new Peer(roomId);
+  peer.on('connection', conn => {
+    connections.set(conn.peer, conn);
+    conn.on('data', data => handleHostData(conn, data));
+    conn.on('close', () => {
+      hostState.participants = hostState.participants.filter(p=>p.peerId!==conn.peer);
+      connections.delete(conn.peer);
+      broadcastState();
+    });
+  });
+  peer.on('open', id => {
+    hostState.roomId = id;
+    const url = location.origin + location.pathname + '?room=' + encodeURIComponent(id);
+    document.getElementById('sm-share-link').textContent = id;
+    document.getElementById('sm-share-link').dataset.url = url;
+    document.getElementById('sm-qr').src = 'https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=' + encodeURIComponent(url);
+    document.getElementById('sm-room-name').textContent = hostState.roomName;
+    showView('view-sm-room');
+    renderSmRoom();
+  });
+  peer.on('error', err => {
+    if(err.type === 'unavailable-id'){
+      attemptCreatePeer(slugify(hostState.roomName) + '-' + randId(6));
+    } else {
+      alert('Erro de conexão (' + err.type + '). Verifique sua internet e recarregue a página.');
+    }
+  });
+}
+
+function handleHostData(conn, data){
+  if(data.type === 'join'){
+    const existing = hostState.participants.find(p=>p.peerId===conn.peer);
+    if(!existing){
+      hostState.participants.push({peerId:conn.peer, name:(data.name||'Anônimo').slice(0,24), voted:false, vote:null});
+    }
+    broadcastState();
+  } else if(data.type === 'vote'){
+    if(!hostState.votingOpen || hostState.revealed) return;
+    const p = hostState.participants.find(p=>p.peerId===conn.peer);
+    if(p){ p.voted = true; p.vote = data.value; broadcastState(); }
+  }
+}
+
+function buildClientPayload(){
+  return {
+    roomName: hostState.roomName,
+    scaleKey: hostState.scaleKey,
+    stories: hostState.stories,
+    currentIndex: hostState.currentIndex,
+    votingOpen: hostState.votingOpen,
+    revealed: hostState.revealed,
+    finalEstimates: hostState.finalEstimates,
+    participants: hostState.participants.map(p => ({
+      name: p.name, voted: p.voted, vote: hostState.revealed ? p.vote : null
+    }))
+  };
+}
+
+function broadcastState(){
+  const payload = {type:'state', state: buildClientPayload()};
+  connections.forEach(conn => { if(conn.open) conn.send(payload); });
+  renderSmRoom();
+}
+
+function toggleAddStoryBox(){
+  document.getElementById('add-story-box').classList.toggle('hidden');
+}
+
+function addStories(){
+  const raw = document.getElementById('input-new-stories').value;
+  const lines = raw.split('\n').map(s=>s.trim()).filter(Boolean);
+  if(lines.length===0) return;
+  const newStories = lines.map(l => parseStoryLine(l, hostState.adoBase));
+  hostState.stories = hostState.stories.concat(newStories);
+  document.getElementById('input-new-stories').value = '';
+  document.getElementById('add-story-box').classList.add('hidden');
+  broadcastState();
+}
+
+function releaseNext(){
+  if(hostState.currentIndex >= hostState.stories.length - 1) return;
+  hostState.currentIndex++;
+  hostState.participants.forEach(p=>{ p.voted=false; p.vote=null; });
+  hostState.votingOpen = true;
+  hostState.revealed = false;
+  broadcastState();
+}
+
+function revealVotes(){
+  if(!hostState.votingOpen) return;
+  hostState.revealed = true;
+  hostState.voteHistory[hostState.currentIndex] = {
+    scaleKey: hostState.scaleKey,
+    storyLabel: hostState.stories[hostState.currentIndex] ? hostState.stories[hostState.currentIndex].label : ('US' + (hostState.currentIndex+1)),
+    votes: hostState.participants.map(p => ({ name:p.name, vote:p.vote }))
+  };
+  broadcastState();
+}
+
+function setFinalEstimate(index, value){
+  hostState.finalEstimates[index] = value;
+  broadcastState();
+}
+
+function confirmCloseRoom(){
+  if(confirm('Encerrar a sala para todos os participantes? Essa ação não pode ser desfeita.')){
+    closeRoom();
+  }
+}
+function closeRoom(){
+  connections.forEach(conn => { if(conn.open) conn.send({type:'closed'}); });
+  setTimeout(()=>{ if(peer) peer.destroy(); }, 300);
+  document.getElementById('closed-message').textContent = 'Você encerrou a sala "' + hostState.roomName + '".';
+  const hasEstimates = Object.keys(hostState.finalEstimates).length > 0 || hostState.currentIndex >= 0;
+  document.getElementById('closed-summary-wrap').classList.toggle('hidden', !hasEstimates);
+  if(hasEstimates){
+    document.getElementById('summary-box').textContent = buildSummaryText();
+  }
+  const hasHistory = Object.keys(hostState.voteHistory).length > 0;
+  document.getElementById('closed-insights-wrap').classList.toggle('hidden', !hasHistory);
+  if(hasHistory){
+    document.getElementById('insights-box').textContent = buildInsightsText();
+  }
+  showView('view-closed');
+}
+
+function buildSummaryText(){
+  let lines = ['Sala: ' + hostState.roomName, ''];
+  hostState.stories.forEach((s,i) => {
+    const est = hostState.finalEstimates[i];
+    lines.push('US' + (i+1) + ': ' + s.label + (s.url ? ' — ' + s.url : ''));
+    lines.push('Estimativa final: ' + (est !== undefined && est !== '' ? est : '(não definida)'));
+    lines.push('');
+  });
+  return lines.join('\n');
+}
+function buildInsightsText(){
+  const entries = Object.keys(hostState.voteHistory).map(k => hostState.voteHistory[k]);
+  if(entries.length === 0){
+    return 'Nenhuma votação foi revelada nessa sessão, então não há dados suficientes para gerar insights.';
+  }
+
+  let consensusCount = 0, specialCount = 0;
+  const highDivergence = [], midDivergence = [];
+
+  entries.forEach(entry => {
+    const order = (SCALES[entry.scaleKey] || SCALES.fibonacci).order;
+    const voteValues = entry.votes.map(v => v.vote).filter(v => v !== null && v !== undefined);
+    voteValues.forEach(v => { if(v === '☕' || v === '?') specialCount++; });
+    const div = computeDivergence(voteValues, order);
+    if(!div) return;
+    const ratio = div.spreadSteps / div.maxSteps;
+    if(div.consenso){ consensusCount++; }
+    else if(ratio > 0.5){ highDivergence.push({label:entry.storyLabel, min:div.minLabel, max:div.maxLabel}); }
+    else if(ratio > 0.2){ midDivergence.push({label:entry.storyLabel, min:div.minLabel, max:div.maxLabel}); }
+  });
+
+  const total = entries.length;
+  const lines = [];
+  lines.push('Resumo da sessão');
+  lines.push('');
+  lines.push('US com votação revelada: ' + total);
+  lines.push('Consenso imediato: ' + consensusCount + ' de ' + total);
+  lines.push('Divergência alta: ' + highDivergence.length + ' de ' + total);
+  if(specialCount > 0) lines.push('Pedidos de pausa/mais contexto (☕ ou ?): ' + specialCount);
+  lines.push('');
+
+  if(highDivergence.length){
+    lines.push('Pontos de atenção');
+    lines.push('');
+    highDivergence.forEach(h => {
+      lines.push('- ' + h.label + ': votos de "' + h.min + '" a "' + h.max + '". Vale abrir a discussão antes de travar a estimativa final — divergência grande costuma indicar entendimentos diferentes do escopo.');
+    });
+    lines.push('');
+  }
+  if(midDivergence.length){
+    lines.push('Divergências moderadas (vale um olhar rápido)');
+    lines.push('');
+    midDivergence.forEach(h => { lines.push('- ' + h.label + ': "' + h.min + '" a "' + h.max + '".'); });
+    lines.push('');
+  }
+
+  lines.push('Dicas para o SM');
+  lines.push('');
+  const highRatio = total ? highDivergence.length / total : 0;
+  if(highRatio > 0.3){
+    lines.push('- Mais de 30% das US tiveram divergência alta. Pode valer revisar os critérios de Definition of Ready com o PO antes da próxima sessão.');
+  }
+  if(specialCount > 0){
+    lines.push('- Houve pedidos de pausa ou mais contexto durante a votação. Considere detalhar melhor essas histórias antes da próxima rodada.');
+  }
+  if(consensusCount === total && total > 0){
+    lines.push('- Consenso rápido em todas as US: sinal de que o time está bem alinhado sobre o escopo da sprint.');
+  } else if(highDivergence.length === 0 && midDivergence.length === 0){
+    lines.push('- Nenhuma divergência relevante identificada — sessão tranquila.');
+  }
+  lines.push('- Vale revisitar as US com maior divergência no próximo refinamento, pra não perder o contexto da discussão de hoje.');
+
+  return lines.join('\n');
+}
+function copySummary(){
+  navigator.clipboard.writeText(buildSummaryText());
+}
+function copyInsights(){
+  navigator.clipboard.writeText(buildInsightsText());
+}
+
+function startNewRoom(){
+  if(peer){ try{ peer.destroy(); }catch(e){} peer = null; }
+  if(devPeer){ try{ devPeer.destroy(); }catch(e){} devPeer = null; devConn = null; }
+  connections.clear();
+
+  hostState.roomName = ''; hostState.scaleKey = 'fibonacci'; hostState.stories = [];
+  hostState.adoBase = ''; hostState.voteHistory = {};
+  hostState.currentIndex = -1; hostState.votingOpen = false; hostState.revealed = false;
+  hostState.participants = []; hostState.finalEstimates = {}; hostState.roomId = '';
+  lastState = null; myVote = null; devName = ''; targetRoomId = '';
+
+  document.getElementById('input-room-name').value = '';
+  document.getElementById('input-stories').value = '';
+  document.getElementById('input-ado-base').value = '';
+  selectScale('fibonacci');
+  const btn = document.getElementById('btn-create-room');
+  btn.disabled = false;
+  btn.textContent = 'Criar sala e gerar link';
+
+  if(window.history && window.history.replaceState){
+    window.history.replaceState(null, '', location.pathname);
+  }
+  showView('view-create');
+}
+function copyShareLink(){
+  const url = document.getElementById('sm-share-link').dataset.url;
+  if(url) navigator.clipboard.writeText(url);
+}
+
+/* ---------- SM rendering ---------- */
+function renderSmRoom(){
+  // sidebar stories
+  const list = document.getElementById('stories-list');
+  list.innerHTML = hostState.stories.map((s,i)=>{
+    let cls = 'story-item';
+    if(i === hostState.currentIndex) cls += ' current';
+    else if(i < hostState.currentIndex) cls += ' done';
+    const est = hostState.finalEstimates[i];
+    const labelHtml = s.url
+      ? `<a href="${escapeHtml(s.url)}" target="_blank" rel="noopener">${escapeHtml(s.label)}</a>`
+      : `<span>${escapeHtml(s.label)}</span>`;
+    return `<div class="${cls}"><span class="num">US${i+1}</span>${labelHtml}<input class="est-input" type="text" value="${escapeHtml(est||'')}" placeholder="—" title="Estimativa final desta US" onclick="event.stopPropagation()" onchange="setFinalEstimate(${i}, this.value)"></div>`;
+  }).join('');
+
+  // center card
+  const center = document.getElementById('center-card');
+  if(hostState.currentIndex === -1){
+    center.className = 'center-card waiting';
+    center.innerHTML = '<p>Aguardando início</p>';
+  } else {
+    center.className = 'center-card';
+    const s = hostState.stories[hostState.currentIndex];
+    center.innerHTML = `<div class="tag">US${hostState.currentIndex+1}</div><p>${escapeHtml(s.label)}</p>${storyLinkHtml(s,'Abrir no Azure DevOps')}`;
+  }
+
+  // seats
+  layoutSeats();
+
+  // footer counts
+  const votedCount = hostState.participants.filter(p=>p.voted).length;
+  const total = hostState.participants.length;
+  document.getElementById('vote-count').innerHTML = total
+    ? `<strong>${votedCount}</strong> de <strong>${total}</strong> votaram`
+    : 'Aguardando participantes entrarem…';
+
+  // buttons
+  const nextBtn = document.getElementById('btn-next');
+  const revealBtn = document.getElementById('btn-reveal');
+  if(hostState.currentIndex >= hostState.stories.length - 1 && hostState.currentIndex !== -1){
+    nextBtn.textContent = 'Última US da lista';
+    nextBtn.disabled = true;
+  } else {
+    nextBtn.disabled = false;
+    nextBtn.textContent = hostState.currentIndex === -1 ? 'Liberar votação — US 1' : 'Próxima US →';
+  }
+  revealBtn.disabled = !hostState.votingOpen || hostState.revealed || votedCount === 0;
+
+  // reveal panel
+  const panel = document.getElementById('reveal-panel');
+  if(hostState.revealed){
+    panel.classList.remove('hidden');
+    panel.innerHTML = buildRevealPanelHtml(hostState.participants, hostState.currentIndex, hostState.finalEstimates, true, hostState.scaleKey);
+  } else {
+    panel.classList.add('hidden');
+    panel.innerHTML = '';
+  }
+}
+
+function layoutSeats(){
+  const oval = document.getElementById('table-oval');
+  const seatsWrap = document.getElementById('table-seats');
+  const n = hostState.participants.length;
+  if(n === 0){
+    seatsWrap.innerHTML = '<div class="empty-table-msg">Compartilhe o link para os devs se sentarem à mesa</div>';
+    return;
+  }
+  const w = oval.clientWidth || 500;
+  const h = oval.clientHeight || 220;
+  const cx = w/2, cy = h/2;
+  const rx = cx - 30, ry = cy - 10;
+  seatsWrap.innerHTML = hostState.participants.map((p,i)=>{
+    const angle = (Math.PI*2*i/n) - Math.PI/2;
+    const x = cx + rx*Math.cos(angle);
+    const y = cy + ry*Math.sin(angle);
+    let cls = 'seat';
+    let label = '…';
+    if(hostState.revealed){ cls += ' seat-revealed'; label = p.vote ?? ''; }
+    else if(p.voted){ cls += ' seat-voted'; label = '✓'; }
+    return `<div class="${cls}" style="left:${x}px; top:${y}px;">
+      <div class="seat-card">${escapeHtml(String(label))}</div>
+      <div class="seat-name">${escapeHtml(p.name)}</div>
+    </div>`;
+  }).join('');
+}
+window.addEventListener('resize', () => { if(!document.getElementById('view-sm-room').classList.contains('hidden')) layoutSeats(); });
+
+function sortByScaleOrder(entries, order){
+  return entries.sort((a,b) => {
+    let ia = order.indexOf(a[0]); if(ia < 0) ia = order.length + (a[0] === '☕' ? 0 : 1);
+    let ib = order.indexOf(b[0]); if(ib < 0) ib = order.length + (b[0] === '☕' ? 0 : 1);
+    return ia - ib;
+  });
+}
+function computeDivergence(votes, order){
+  const idxList = votes.map(v => order.indexOf(v)).filter(i => i >= 0);
+  if(idxList.length === 0) return null;
+  const minIdx = Math.min(...idxList), maxIdx = Math.max(...idxList);
+  return {
+    minLabel: order[minIdx], maxLabel: order[maxIdx],
+    spreadSteps: maxIdx - minIdx,
+    maxSteps: Math.max(1, order.length - 1),
+    consenso: minIdx === maxIdx
+  };
+}
+function buildRevealPanelHtml(participants, currentIndex, finalEstimates, isHost, scaleKey){
+  const order = (SCALES[scaleKey] || SCALES.fibonacci).order;
+  const votes = participants.map(p=>p.vote);
+  const counts = {};
+  votes.forEach(v => { if(v!==null && v!==undefined){ counts[v] = (counts[v]||0)+1; } });
+  const maxCount = Math.max(1, ...Object.values(counts));
+  const divergence = computeDivergence(votes, order);
+
+  let statsHtml = '';
+  if(divergence){
+    statsHtml = `<div class="stats-row">
+      <span>Menor: <b>${escapeHtml(divergence.minLabel)}</b></span><span>Maior: <b>${escapeHtml(divergence.maxLabel)}</b></span>
+      <span class="badge ${divergence.consenso?'badge-ok':'badge-warn'}">${divergence.consenso?'Consenso ✓':'Divergência — vale discutir'}</span>
+    </div>`;
+  }
+
+  const sortedEntries = sortByScaleOrder(Object.entries(counts), order);
+  const histHtml = `<div class="histogram">${sortedEntries.map(([val,cnt])=>`
+    <div class="hist-bar"><div class="bar" style="height:${(cnt/maxCount*90)+10}px;"></div><div class="cnt">${cnt}</div><div class="val">${escapeHtml(val)}</div></div>
+  `).join('')}</div>`;
+
+  const chipsHtml = `<div class="votes-list">${participants.map(p=>`<span class="vote-chip">${escapeHtml(p.name)}<b>${escapeHtml(String(p.vote ?? '—'))}</b></span>`).join('')}</div>`;
+
+  let finalRow = '';
+  if(isHost){
+    const currentEst = finalEstimates[currentIndex] ?? '';
+    finalRow = `<div class="final-est-row" style="margin-top:14px;">
+      <label style="margin:0;">Estimativa final</label>
+      <input type="text" id="final-est-input" value="${escapeHtml(currentEst)}" placeholder="ex: 5">
+      <button class="btn btn-ghost btn-small" onclick="setFinalEstimate(${currentIndex}, document.getElementById('final-est-input').value)">Salvar</button>
+    </div>`;
+  }
+
+  return `<h4>Resultado da votação</h4>${histHtml}${statsHtml}${chipsHtml}${finalRow}`;
+}
+
+/* ======================================================================
+   DEV (participant) STATE + LOGIC
+====================================================================== */
+let devPeer = null, devConn = null;
+let devName = '', targetRoomId = '', myVote = null;
+let lastState = null;
+
+function showManualJoin(){
+  document.getElementById('manual-join-box').classList.remove('hidden');
+}
+function startManualJoin(){
+  const code = document.getElementById('manual-room-code').value.trim();
+  const name = document.getElementById('manual-dev-name').value.trim();
+  if(!code || !name){ alert('Preencha o código da sala e seu nome.'); return; }
+  joinRoom(code, name);
+}
+function startLinkJoin(){
+  const name = document.getElementById('input-dev-name').value.trim();
+  if(!name){ alert('Digite seu nome.'); return; }
+  joinRoom(targetRoomId, name);
+}
+
+function joinRoom(roomId, name){
+  devName = name; targetRoomId = roomId;
+  document.getElementById('dev-room-name').textContent = 'Conectando…';
+  showView('view-dev-room');
+
+  devPeer = new Peer();
+  devPeer.on('open', () => {
+    devConn = devPeer.connect(roomId, {reliable:true});
+    devConn.on('open', () => devConn.send({type:'join', name:devName}));
+    devConn.on('data', data => {
+      if(data.type === 'state'){ lastState = data.state; renderDevRoom(); }
+      else if(data.type === 'closed'){ handleRoomClosedOnDev(); }
+    });
+    devConn.on('close', () => {
+      document.getElementById('dev-status').textContent = 'Conexão com a sala foi perdida. Peça um novo link ao Scrum Master.';
+    });
+  });
+  devPeer.on('error', err => {
+    document.getElementById('dev-status').textContent = 'Não foi possível conectar (' + err.type + '). Confira o link/código e tente novamente.';
+  });
+}
+
+function castVote(value){
+  if(!devConn || !devConn.open || !lastState || !lastState.votingOpen || lastState.revealed) return;
+  myVote = value;
+  devConn.send({type:'vote', value});
+  renderDevRoom();
+}
+
+function handleRoomClosedOnDev(){
+  document.getElementById('closed-message').textContent = 'O Scrum Master encerrou a sala. Obrigado por participar!';
+  document.getElementById('closed-summary-wrap').classList.add('hidden');
+  document.getElementById('closed-insights-wrap').classList.add('hidden');
+  showView('view-closed');
+}
+
+function renderDevRoom(){
+  if(!lastState) return;
+  document.getElementById('dev-room-name').textContent = lastState.roomName;
+
+  const tag = document.getElementById('dev-story-tag');
+  const text = document.getElementById('dev-story-text');
+  const idx = lastState.currentIndex;
+
+  if(idx === -1){
+    tag.textContent = 'Aguardando';
+    text.innerHTML = 'O Scrum Master ainda vai liberar a primeira US.';
+  } else {
+    const s = lastState.stories[idx];
+    tag.textContent = 'US ' + (idx+1) + ' de ' + lastState.stories.length;
+    text.innerHTML = escapeHtml(s.label) + storyLinkHtml(s,'Abrir no Azure DevOps');
+  }
+
+  const me = lastState.participants.find(p=>p.name===devName);
+  const status = document.getElementById('dev-status');
+  const hand = document.getElementById('dev-hand');
+  const revealPanel = document.getElementById('dev-reveal-panel');
+
+  if(idx === -1){
+    status.textContent = '';
+    hand.innerHTML = '';
+    revealPanel.innerHTML = '';
+  } else if(lastState.revealed){
+    status.textContent = 'Votos revelados — hora da discussão.';
+    hand.innerHTML = '';
+    revealPanel.innerHTML = buildRevealPanelHtml(lastState.participants, lastState.currentIndex, lastState.finalEstimates, false, lastState.scaleKey);
+  } else if(lastState.votingOpen){
+    if(me && me.voted){
+      status.textContent = 'Voto registrado ✅ Aguardando os demais…';
+    } else {
+      status.textContent = 'Escolha sua carta:';
+    }
+    revealPanel.innerHTML = '';
+    const deck = (SCALES[lastState.scaleKey] || SCALES.fibonacci).deck;
+    hand.innerHTML = deck.map(v => {
+      const selected = me && me.voted && String(me.vote ?? myVote) === v ? 'selected' : '';
+      return `<button class="poker-card ${selected}" onclick="castVote('${v}')">${v}</button>`;
+    }).join('');
+  } else {
+    status.textContent = 'Aguardando o Scrum Master liberar a próxima US…';
+    hand.innerHTML = '';
+    revealPanel.innerHTML = '';
+  }
+
+  document.getElementById('dev-participants').innerHTML = lastState.participants.map(p =>
+    `<span class="pchip ${p.voted?'voted':''}">${escapeHtml(p.name)}</span>`
+  ).join('');
+}
+
+/* ======================================================================
+   INIT
+====================================================================== */
+document.addEventListener('DOMContentLoaded', () => {
+  const params = new URLSearchParams(location.search);
+  const roomParam = params.get('room');
+  if(roomParam){
+    targetRoomId = roomParam;
+    document.getElementById('join-room-label').textContent = 'Entrar na sala';
+    showView('view-join');
+  } else if(params.get('view') === 'create'){
+    showView('view-create');
+  } else if(params.get('join') === '1'){
+    showView('view-landing');
+    showManualJoin();
+  } else {
+    showView('view-landing');
+  }
+});
+</script>
+</body>
+</html>
