@@ -295,6 +295,16 @@
   }
   .vote-chip b{color:var(--gold-bright);margin-left:4px;}
 
+  .history-item{background:var(--void);border:1px solid var(--line);border-radius:10px;padding:12px 14px;}
+  .history-item .h-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:4px;}
+  .history-item .h-company{font-weight:700;font-size:13.5px;color:var(--text);}
+  .history-item .h-room{font-size:12.5px;color:var(--text-muted);margin-bottom:6px;}
+  .history-item .h-stats{display:flex;gap:12px;font-size:11.5px;color:var(--text-muted);flex-wrap:wrap;}
+  .history-item .h-stats b{color:var(--gold-bright);}
+  .history-badge{display:inline-block;padding:2px 9px;border-radius:10px;font-size:10.5px;font-weight:700;flex-shrink:0;}
+  .history-badge-open{background:var(--success-bg);color:var(--success-fg);}
+  .history-badge-closed{background:var(--void-2);color:var(--text-muted);border:1px solid var(--line);}
+
   /* ---------- dev room ---------- */
   .dev-shell{width:100%;max-width:520px;margin:0 auto;padding:24px 18px 40px;min-height:100vh;display:flex;flex-direction:column;}
   .dev-header{text-align:center;margin-bottom:18px;}
@@ -359,6 +369,19 @@
       <input type="text" id="manual-dev-name" placeholder="Como o SM vai te ver na mesa">
       <button class="btn btn-primary" onclick="startManualJoin()">Entrar na sala</button>
     </div>
+    <p style="text-align:center;margin:22px 0 0;">
+      <a href="#" onclick="event.preventDefault(); showHistory();" style="font-size:12.5px;color:var(--text-muted);">Ver histórico de uso</a>
+    </p>
+  </div>
+</div>
+
+<div id="view-history" class="view screen hidden">
+  <div class="panel" style="max-width:640px;">
+    <p class="eyebrow">Histórico</p>
+    <h1>Empresas e sessões</h1>
+    <p class="subtitle">Registro de todas as salas criadas nesta ferramenta.</p>
+    <div id="history-list" style="max-height:420px;overflow:auto;display:flex;flex-direction:column;gap:10px;"></div>
+    <button class="btn btn-ghost" style="width:100%;margin-top:18px;" onclick="showView('view-landing')">Voltar</button>
   </div>
 </div>
 
@@ -630,10 +653,12 @@ function firebaseNotConfigured(){
 }
 
 let roomRef = null;
+let currentHistoryKey = null;
 
 const hostState = {
   roomName:'', companyName:'', scaleKey:'fibonacci', stories:[], currentIndex:-1, adoBase:'',
-  votingOpen:false, revealed:false, participants:[], finalEstimates:{}, roomId:'', voteHistory:{}, roomStartedAt:null
+  votingOpen:false, revealed:false, participants:[], finalEstimates:{}, roomId:'', voteHistory:{}, roomStartedAt:null,
+  currentStoryReleasedAt:null
 };
 
 function selectScale(key){
@@ -674,6 +699,18 @@ function createRoom(){
   hostState.roomId = roomId;
   roomRef = db.ref('rooms/' + roomId);
 
+  const historyRef = db.ref('history').push();
+  currentHistoryKey = historyRef.key;
+  historyRef.set({
+    companyName: company,
+    roomName: name,
+    scaleKey: hostState.scaleKey,
+    storiesCount: stories.length,
+    roomId: roomId,
+    createdAt: firebase.database.ServerValue.TIMESTAMP,
+    closedAt: null
+  });
+
   writeState();
 
   roomRef.child('participants').on('value', snap => {
@@ -708,6 +745,7 @@ function writeState(){
     finalEstimates: hostState.finalEstimates,
     adoBase: hostState.adoBase,
     roomStartedAt: hostState.roomStartedAt,
+    historyKey: currentHistoryKey,
     closed: false
   });
   renderSmRoom();
@@ -735,6 +773,7 @@ function reconnectAsSM(roomId){
     hostState.scaleKey = state.scaleKey || 'fibonacci';
     hostState.stories = state.stories || [];
     hostState.adoBase = state.adoBase || '';
+    currentHistoryKey = state.historyKey || null;
     hostState.currentIndex = (typeof state.currentIndex === 'number') ? state.currentIndex : -1;
     hostState.votingOpen = !!state.votingOpen;
     hostState.revealed = !!state.revealed;
@@ -787,6 +826,7 @@ function releaseNext(){
   hostState.participants.forEach(p=>{ p.voted=false; p.vote=null; });
   hostState.votingOpen = true;
   hostState.revealed = false;
+  hostState.currentStoryReleasedAt = Date.now();
   if(roomRef && hostState.participants.length){
     const updates = {};
     hostState.participants.forEach(p => { updates[p.peerId + '/voted'] = false; updates[p.peerId + '/vote'] = null; });
@@ -798,10 +838,12 @@ function releaseNext(){
 function revealVotes(){
   if(!hostState.votingOpen) return;
   hostState.revealed = true;
+  const durationMs = hostState.currentStoryReleasedAt ? (Date.now() - hostState.currentStoryReleasedAt) : null;
   hostState.voteHistory[hostState.currentIndex] = {
     scaleKey: hostState.scaleKey,
     storyLabel: hostState.stories[hostState.currentIndex] ? hostState.stories[hostState.currentIndex].label : ('US' + (hostState.currentIndex+1)),
-    votes: hostState.participants.map(p => ({ name:p.name, vote:p.vote }))
+    votes: hostState.participants.map(p => ({ name:p.name, vote:p.vote })),
+    durationMs: durationMs
   };
   if(roomRef){
     roomRef.child('voteHistory/' + hostState.currentIndex).set(hostState.voteHistory[hostState.currentIndex]);
@@ -823,6 +865,13 @@ function closeRoom(){
   if(roomRef){
     roomRef.child('state/closed').set(true);
     roomRef.child('participants').off();
+  }
+  if(currentHistoryKey){
+    db.ref('history/' + currentHistoryKey).update({
+      closedAt: firebase.database.ServerValue.TIMESTAMP,
+      votedCount: Object.keys(hostState.voteHistory).length,
+      participantsCount: hostState.participants.length
+    });
   }
   document.getElementById('closed-message').textContent = 'Você encerrou a sala "' + hostState.roomName + '".';
   const hasEstimates = Object.keys(hostState.finalEstimates).length > 0 || hostState.currentIndex >= 0;
@@ -849,33 +898,110 @@ function buildSummaryText(){
   return lines.join('\n');
 }
 function buildInsightsText(){
-  const entries = Object.keys(hostState.voteHistory).map(k => hostState.voteHistory[k]);
+  const order = (SCALES[hostState.scaleKey] || SCALES.fibonacci).order;
+  const entries = Object.keys(hostState.voteHistory).map(Number).sort((a,b)=>a-b)
+    .map(idx => Object.assign({idx}, hostState.voteHistory[idx]));
+
   if(entries.length === 0){
     return 'Nenhuma votação foi revelada nessa sessão, então não há dados suficientes para gerar insights.';
   }
 
   let consensusCount = 0, specialCount = 0;
   const highDivergence = [], midDivergence = [];
+  const polarized = [], oversized = [], valueFrequency = {}, finalValueFrequency = {}, stepsUsed = new Set();
+  const individualDev = {};
+  const durations = [];
+
+  const bigThresholdIdx = order.length - Math.max(1, Math.ceil(order.length * 0.25));
 
   entries.forEach(entry => {
-    const order = (SCALES[entry.scaleKey] || SCALES.fibonacci).order;
-    const voteValues = entry.votes.map(v => v.vote).filter(v => v !== null && v !== undefined);
-    voteValues.forEach(v => { if(v === '☕' || v === '?') specialCount++; });
-    const div = computeDivergence(voteValues, order);
-    if(!div) return;
-    const ratio = div.spreadSteps / div.maxSteps;
-    if(div.consenso){ consensusCount++; }
-    else if(ratio > 0.5){ highDivergence.push({label:entry.storyLabel, min:div.minLabel, max:div.maxLabel}); }
-    else if(ratio > 0.2){ midDivergence.push({label:entry.storyLabel, min:div.minLabel, max:div.maxLabel}); }
+    const allVals = entry.votes.map(v => v.vote).filter(v => v !== null && v !== undefined);
+    allVals.forEach(v => {
+      if(v === '☕' || v === '?'){ specialCount++; }
+      else if(order.indexOf(v) >= 0){ valueFrequency[v] = (valueFrequency[v]||0) + 1; stepsUsed.add(v); }
+    });
+    const inScaleVals = allVals.filter(v => order.indexOf(v) >= 0);
+
+    const div = computeDivergence(inScaleVals, order);
+    if(div){
+      const ratio = div.spreadSteps / div.maxSteps;
+      if(div.consenso){ consensusCount++; }
+      else if(ratio > 0.5){ highDivergence.push({label:entry.storyLabel, min:div.minLabel, max:div.maxLabel}); }
+      else if(ratio > 0.2){ midDivergence.push({label:entry.storyLabel, min:div.minLabel, max:div.maxLabel}); }
+    }
+
+    const counts = {};
+    inScaleVals.forEach(v => counts[v] = (counts[v]||0) + 1);
+    const distinct = Object.keys(counts);
+    if(distinct.length === 2 && inScaleVals.length >= 4){
+      const ia = order.indexOf(distinct[0]), ib = order.indexOf(distinct[1]);
+      if(counts[distinct[0]] >= 2 && counts[distinct[1]] >= 2 && Math.abs(ia-ib) >= Math.ceil(order.length/2)){
+        polarized.push({label:entry.storyLabel, a:distinct[0], countA:counts[distinct[0]], b:distinct[1], countB:counts[distinct[1]]});
+      }
+    }
+
+    const finalVal = hostState.finalEstimates[entry.idx];
+    let checkVal = finalVal;
+    if(!checkVal && distinct.length){
+      checkVal = distinct.slice().sort((a,b) => counts[b]-counts[a])[0];
+    }
+    if(checkVal){
+      const iv = order.indexOf(String(checkVal));
+      if(iv >= 0){ finalValueFrequency[checkVal] = (finalValueFrequency[checkVal]||0) + 1; }
+      if(iv >= bigThresholdIdx){ oversized.push({label:entry.storyLabel, value:checkVal}); }
+    }
+
+    const idxList = inScaleVals.map(v => order.indexOf(v)).filter(i=>i>=0).sort((a,b)=>a-b);
+    const med = medianOfSorted(idxList);
+    if(med !== null){
+      entry.votes.forEach(v => {
+        if(v.vote === null || v.vote === undefined) return;
+        const iv = order.indexOf(v.vote);
+        if(iv < 0) return;
+        if(!individualDev[v.name]) individualDev[v.name] = {sum:0, count:0};
+        individualDev[v.name].sum += (iv - med);
+        individualDev[v.name].count += 1;
+      });
+    }
+
+    if(entry.durationMs){ durations.push({label:entry.storyLabel, ms:entry.durationMs}); }
   });
 
   const total = entries.length;
+
+  const anchored = Object.keys(finalValueFrequency).filter(v => finalValueFrequency[v] >= 3 && finalValueFrequency[v] >= total * 0.4);
+
+  const usedSteps = order.filter(v => stepsUsed.has(v));
+  let skippedMiddle = false;
+  if(order.length > 3 && usedSteps.length >= 2){
+    const usedIdx = usedSteps.map(v => order.indexOf(v)).sort((a,b)=>a-b);
+    for(let i=1;i<usedIdx.length;i++){ if(usedIdx[i] - usedIdx[i-1] > 2){ skippedMiddle = true; break; } }
+  }
+
+  const highBias = Object.keys(individualDev)
+    .map(name => ({name, avg: individualDev[name].sum / individualDev[name].count, count: individualDev[name].count}))
+    .filter(p => p.count >= 3 && Math.abs(p.avg) >= 1)
+    .sort((a,b) => Math.abs(b.avg) - Math.abs(a.avg));
+
+  let fatigueSignal = null;
+  if(durations.length >= 4){
+    const mid = Math.floor(durations.length/2);
+    const firstAvg = durations.slice(0,mid).reduce((a,d)=>a+d.ms,0) / mid;
+    const secondAvg = durations.slice(mid).reduce((a,d)=>a+d.ms,0) / (durations.length-mid);
+    if(secondAvg > firstAvg * 1.6){ fatigueSignal = {firstAvg, secondAvg}; }
+  }
+
+  const sessionMinutes = hostState.roomStartedAt ? Math.round((Date.now()-hostState.roomStartedAt)/60000) : null;
+  const personHours = (sessionMinutes && hostState.participants.length) ? (hostState.participants.length * sessionMinutes / 60) : null;
+
   const lines = [];
   lines.push('Resumo da sessão');
   lines.push('');
   lines.push('US com votação revelada: ' + total);
   lines.push('Consenso imediato: ' + consensusCount + ' de ' + total);
   lines.push('Divergência alta: ' + highDivergence.length + ' de ' + total);
+  if(sessionMinutes !== null) lines.push('Tempo total de sessão: ' + sessionMinutes + ' min');
+  if(personHours !== null) lines.push('Custo estimado (participantes × tempo): ' + personHours.toFixed(1) + ' pessoas-hora');
   if(specialCount > 0) lines.push('Pedidos de pausa/mais contexto (☕ ou ?): ' + specialCount);
   lines.push('');
 
@@ -894,21 +1020,66 @@ function buildInsightsText(){
     lines.push('');
   }
 
+  const patternLines = [];
+  polarized.forEach(p => {
+    patternLines.push('- Polarização em ' + p.label + ': ' + p.countA + ' voto(s) em "' + p.a + '" e ' + p.countB + ' em "' + p.b + '", sem meio-termo. Cheira a duas abordagens técnicas diferentes, não só desalinhamento de entendimento — vale perguntar como cada grupo pensou em resolver.');
+  });
+  highBias.forEach(p => {
+    const dir = p.avg > 0 ? 'acima' : 'abaixo';
+    const tail = p.avg > 0
+      ? 'Pode estar enxergando riscos que o resto do time não vê — vale ouvir o raciocínio.'
+      : 'Vale confirmar se está considerando testes, documentação e deploy, não só código.';
+    patternLines.push('- ' + p.name + ' estimou sistematicamente ' + dir + ' do grupo (em média ' + Math.abs(p.avg).toFixed(1) + ' passo(s) na escala, em ' + p.count + ' US). ' + tail);
+  });
+  anchored.forEach(v => {
+    patternLines.push('- O valor "' + v + '" foi o resultado final em ' + finalValueFrequency[v] + ' US diferentes. Se essas histórias não são parecidas de verdade, pode ser ancoragem — o time repetindo um número em vez de reavaliar cada item.');
+  });
+  if(oversized.length >= 2){
+    patternLines.push('- ' + oversized.length + ' US ficaram nos maiores valores da escala (' + oversized.map(o=>o.label).join(', ') + '). Itens grandes escondem complexidade e atrasam feedback — considere fatiar antes da próxima sprint.');
+  }
+  if(skippedMiddle){
+    patternLines.push('- O time pulou valores intermediários da escala em algumas votações. Pode estar tratando a escala como linear em vez de exponencial — vale reforçar o significado de cada salto.');
+  }
+  if(fatigueSignal){
+    patternLines.push('- O tempo médio por US quase dobrou na segunda metade da sessão (de ~' + Math.round(fatigueSignal.firstAvg/60000) + ' min para ~' + Math.round(fatigueSignal.secondAvg/60000) + ' min). Pode ser sinal de fadiga — considere sessões mais curtas ou uma pausa no meio.');
+  }
+
+  if(patternLines.length){
+    lines.push('Padrões identificados');
+    lines.push('');
+    lines.push.apply(lines, patternLines);
+    lines.push('');
+  }
+
   lines.push('Dicas para o SM');
   lines.push('');
+  const tips = [];
   const highRatio = total ? highDivergence.length / total : 0;
   if(highRatio > 0.3){
-    lines.push('- Mais de 30% das US tiveram divergência alta. Pode valer revisar os critérios de Definition of Ready com o PO antes da próxima sessão.');
+    tips.push('Mais de 30% das US tiveram divergência alta. Pode valer revisar os critérios de Definition of Ready com o PO antes da próxima sessão.');
   }
   if(specialCount > 0){
-    lines.push('- Houve pedidos de pausa ou mais contexto durante a votação. Considere detalhar melhor essas histórias antes da próxima rodada.');
+    tips.push('Houve pedidos de pausa ou mais contexto durante a votação. Considere detalhar melhor essas histórias antes da próxima rodada.');
   }
-  if(consensusCount === total && total > 0){
-    lines.push('- Consenso rápido em todas as US: sinal de que o time está bem alinhado sobre o escopo da sprint.');
-  } else if(highDivergence.length === 0 && midDivergence.length === 0){
-    lines.push('- Nenhuma divergência relevante identificada — sessão tranquila.');
+  if(polarized.length){
+    tips.push('Em votações polarizadas, peça que cada grupo explique sua abordagem antes de forçar um número — a diferença pode estar na solução, não no tamanho.');
   }
-  lines.push('- Vale revisitar as US com maior divergência no próximo refinamento, pra não perder o contexto da discussão de hoje.');
+  if(highBias.length){
+    tips.push('Reserve um momento privado com quem estima consistentemente diferente do grupo — pode ser sinal de conhecimento que falta ao time, não "estar errado".');
+  }
+  if(oversized.length >= 2){
+    tips.push('Antes da próxima sprint, tente fatiar as histórias grandes em pedaços que caibam em um dia de trabalho — isso reduz risco e acelera o feedback.');
+  }
+  if(fatigueSignal){
+    tips.push('Limite a quantidade de itens por sessão ou divida em duas plannings curtas — decisões no fim de uma sessão longa tendem a ter menos qualidade.');
+  }
+  if(consensusCount === total && total > 0 && highBias.length === 0){
+    tips.push('Consenso rápido em todas as US: sinal de que o time está bem alinhado sobre o escopo da sprint.');
+  } else if(highDivergence.length === 0 && midDivergence.length === 0 && polarized.length === 0){
+    tips.push('Nenhuma divergência relevante identificada — sessão tranquila.');
+  }
+  tips.push('Vale revisitar as US com maior divergência no próximo refinamento, pra não perder o contexto da discussão de hoje.');
+  tips.forEach(t => lines.push('- ' + t));
 
   return lines.join('\n');
 }
@@ -921,11 +1092,13 @@ function copyInsights(){
 
 function startNewRoom(){
   if(roomRef){ try{ roomRef.off(); }catch(e){} roomRef = null; }
+  currentHistoryKey = null;
 
   hostState.roomName = ''; hostState.companyName = ''; hostState.scaleKey = 'fibonacci'; hostState.stories = [];
   hostState.adoBase = ''; hostState.voteHistory = {};
   hostState.currentIndex = -1; hostState.votingOpen = false; hostState.revealed = false;
   hostState.participants = []; hostState.finalEstimates = {}; hostState.roomId = ''; hostState.roomStartedAt = null;
+  hostState.currentStoryReleasedAt = null;
   lastState = null; lastParticipants = []; myVote = null; devName = ''; targetRoomId = ''; myParticipantId = null;
 
   document.getElementById('input-company-name').value = '';
@@ -1059,6 +1232,12 @@ function sortByScaleOrder(entries, order){
     return ia - ib;
   });
 }
+function medianOfSorted(arr){
+  const n = arr.length;
+  if(n === 0) return null;
+  const mid = Math.floor(n/2);
+  return n % 2 ? arr[mid] : (arr[mid-1] + arr[mid]) / 2;
+}
 function computeDivergence(votes, order){
   const idxList = votes.map(v => order.indexOf(v)).filter(i => i >= 0);
   if(idxList.length === 0) return null;
@@ -1112,6 +1291,40 @@ function buildRevealPanelHtml(participants, currentIndex, finalEstimates, isHost
 let devName = '', targetRoomId = '', myVote = null, myParticipantId = null;
 let lastState = null;
 let lastParticipants = [];
+
+function showHistory(){
+  showView('view-history');
+  const list = document.getElementById('history-list');
+  list.innerHTML = '<p style="color:var(--text-muted);font-size:13px;">Carregando…</p>';
+  if(firebaseNotConfigured()){ list.innerHTML = ''; return; }
+  db.ref('history').orderByChild('createdAt').limitToLast(100).once('value').then(snap => {
+    const val = snap.val() || {};
+    const entries = Object.values(val).sort((a,b) => (b.createdAt||0) - (a.createdAt||0));
+    if(entries.length === 0){
+      list.innerHTML = '<p style="color:var(--text-muted);font-size:13px;">Nenhuma sala registrada ainda.</p>';
+      return;
+    }
+    list.innerHTML = entries.map(e => {
+      const date = e.createdAt ? new Date(e.createdAt).toLocaleString('pt-BR') : '—';
+      const isOpen = !e.closedAt;
+      const badge = isOpen
+        ? '<span class="history-badge history-badge-open">Aberta</span>'
+        : '<span class="history-badge history-badge-closed">Encerrada</span>';
+      return `<div class="history-item">
+        <div class="h-top"><span class="h-company">${escapeHtml(e.companyName||'—')}</span>${badge}</div>
+        <div class="h-room">${escapeHtml(e.roomName||'—')} · ${date}</div>
+        <div class="h-stats">
+          <span>Escala: <b>${escapeHtml(e.scaleKey||'—')}</b></span>
+          <span>US: <b>${e.storiesCount ?? '—'}</b></span>
+          <span>Participantes: <b>${e.participantsCount ?? '—'}</b></span>
+          <span>Votadas: <b>${e.votedCount ?? '—'}</b></span>
+        </div>
+      </div>`;
+    }).join('');
+  }).catch(() => {
+    list.innerHTML = '<p style="color:var(--text-muted);font-size:13px;">Não foi possível carregar o histórico.</p>';
+  });
+}
 
 function showManualJoin(){
   document.getElementById('manual-join-box').classList.remove('hidden');
