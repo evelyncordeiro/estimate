@@ -678,6 +678,9 @@ function createRoom(){
   document.getElementById('sm-share-link').dataset.url = url;
   document.getElementById('sm-qr').src = 'https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=' + encodeURIComponent(url);
   document.getElementById('sm-room-name').textContent = hostState.roomName;
+  if(window.history && window.history.replaceState){
+    window.history.replaceState(null, '', location.pathname + '?sm=' + encodeURIComponent(roomId));
+  }
   showView('view-sm-room');
   renderSmRoom();
 }
@@ -692,9 +695,58 @@ function writeState(){
     votingOpen: hostState.votingOpen,
     revealed: hostState.revealed,
     finalEstimates: hostState.finalEstimates,
+    adoBase: hostState.adoBase,
+    roomStartedAt: hostState.roomStartedAt,
     closed: false
   });
   renderSmRoom();
+}
+
+function reconnectAsSM(roomId){
+  if(firebaseNotConfigured()) return;
+  roomRef = db.ref('rooms/' + roomId);
+  Promise.all([
+    roomRef.child('state').once('value'),
+    roomRef.child('voteHistory').once('value')
+  ]).then(([stateSnap, historySnap]) => {
+    const state = stateSnap.val();
+    if(!state || state.closed){
+      alert('Essa sala não existe mais ou já foi encerrada. Você será levada para criar uma nova.');
+      if(window.history && window.history.replaceState){
+        window.history.replaceState(null, '', location.pathname);
+      }
+      showView('view-landing');
+      return;
+    }
+    hostState.roomId = roomId;
+    hostState.roomName = state.roomName || '';
+    hostState.scaleKey = state.scaleKey || 'fibonacci';
+    hostState.stories = state.stories || [];
+    hostState.adoBase = state.adoBase || '';
+    hostState.currentIndex = (typeof state.currentIndex === 'number') ? state.currentIndex : -1;
+    hostState.votingOpen = !!state.votingOpen;
+    hostState.revealed = !!state.revealed;
+    hostState.finalEstimates = state.finalEstimates || {};
+    hostState.roomStartedAt = state.roomStartedAt || Date.now();
+    hostState.voteHistory = historySnap.val() || {};
+
+    roomRef.child('participants').on('value', snap => {
+      const val = snap.val() || {};
+      hostState.participants = Object.keys(val).map(pid => Object.assign({peerId:pid}, val[pid]));
+      renderSmRoom();
+    });
+
+    const url = location.origin + location.pathname + '?room=' + encodeURIComponent(roomId);
+    document.getElementById('sm-share-link').textContent = roomId;
+    document.getElementById('sm-share-link').dataset.url = url;
+    document.getElementById('sm-qr').src = 'https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=' + encodeURIComponent(url);
+    document.getElementById('sm-room-name').textContent = hostState.roomName;
+    showView('view-sm-room');
+    renderSmRoom();
+  }).catch(() => {
+    alert('Não foi possível reconectar à sala. Verifique sua internet e recarregue novamente.');
+    showView('view-landing');
+  });
 }
 
 function toggleAddStoryBox(){
@@ -738,6 +790,9 @@ function revealVotes(){
     storyLabel: hostState.stories[hostState.currentIndex] ? hostState.stories[hostState.currentIndex].label : ('US' + (hostState.currentIndex+1)),
     votes: hostState.participants.map(p => ({ name:p.name, vote:p.vote }))
   };
+  if(roomRef){
+    roomRef.child('voteHistory/' + hostState.currentIndex).set(hostState.voteHistory[hostState.currentIndex]);
+  }
   writeState();
 }
 
@@ -1162,7 +1217,10 @@ function renderDevRoom(){
 document.addEventListener('DOMContentLoaded', () => {
   const params = new URLSearchParams(location.search);
   const roomParam = params.get('room');
-  if(roomParam){
+  const smParam = params.get('sm');
+  if(smParam){
+    reconnectAsSM(smParam);
+  } else if(roomParam){
     targetRoomId = roomParam;
     document.getElementById('join-room-label').textContent = 'Entrar na sala';
     showView('view-join');
