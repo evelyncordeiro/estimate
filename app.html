@@ -117,6 +117,15 @@
   .btn-ghost{background:#ffffff;border:1px solid var(--line);color:var(--text);}
   .btn-ghost:hover{border-color:var(--gold-bright);}
   .btn-ruby{background:linear-gradient(180deg,var(--ruby-bright),var(--ruby));color:#ffffff;}
+  .btn-reveal-ready{
+    background:var(--success-fg);color:#ffffff;border:none;
+    animation:reveal-pulse 1.8s ease-in-out infinite;
+  }
+  .btn-reveal-ready:hover{filter:brightness(1.08);}
+  @keyframes reveal-pulse{
+    0%,100%{box-shadow:0 0 0 0 rgba(24,154,75,0.45);}
+    50%{box-shadow:0 0 0 8px rgba(24,154,75,0);}
+  }
   .btn-small{padding:8px 14px;font-size:13px;}
   .link-row{display:flex;flex-direction:column;align-items:center;gap:2px;margin:20px 0 8px;cursor:pointer;}
   .link-row span{font-size:13px;color:var(--gold-bright);text-decoration:underline;}
@@ -705,6 +714,10 @@ function addStories(){
 
 function releaseNext(){
   if(hostState.currentIndex >= hostState.stories.length - 1) return;
+  if(hostState.currentIndex >= 0 && hostState.votingOpen && !hostState.revealed){
+    const ok = confirm('Você ainda não revelou os votos da US atual. Se avançar agora, não vai dar pra voltar depois. Quer continuar mesmo assim?');
+    if(!ok) return;
+  }
   hostState.currentIndex++;
   hostState.participants.forEach(p=>{ p.voted=false; p.vote=null; });
   hostState.votingOpen = true;
@@ -929,6 +942,7 @@ function renderSmRoom(){
     nextBtn.textContent = hostState.currentIndex === -1 ? 'Liberar votação — US 1' : 'Próxima US →';
   }
   revealBtn.disabled = !hostState.votingOpen || hostState.revealed || votedCount === 0;
+  revealBtn.classList.toggle('btn-reveal-ready', !revealBtn.disabled);
 
   // reveal panel
   const panel = document.getElementById('reveal-panel');
