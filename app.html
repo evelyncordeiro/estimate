@@ -154,6 +154,21 @@
   .room-grid{display:grid;grid-template-columns:260px 1fr;gap:22px;}
   @media(max-width:880px){.room-grid{grid-template-columns:1fr;}}
 
+  .stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:22px;}
+  @media(max-width:700px){.stats-grid{grid-template-columns:1fr;}}
+  .stat-card{
+    background:var(--card-cream);border:1px solid var(--card-line);border-radius:16px;
+    padding:18px;box-shadow:0 12px 28px -18px rgba(0,0,0,0.45);
+  }
+  .stat-chip{
+    width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;
+    font-size:17px;margin-bottom:12px;
+  }
+  .stat-chip-blue{background:rgba(82,113,255,0.14);color:var(--gold);}
+  .stat-chip-success{background:var(--success-bg);color:var(--success-fg);}
+  .stat-label{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--card-ink-muted);font-weight:700;margin-bottom:4px;}
+  .stat-value{font-size:24px;font-weight:700;color:var(--card-ink);}
+
   .stories-side{
     background:var(--void-2);border:1px solid var(--line);border-radius:16px;
     padding:16px;max-height:640px;overflow:auto;
@@ -419,6 +434,24 @@
       </div>
     </div>
 
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-chip stat-chip-blue">👥</div>
+        <div class="stat-label">Participantes</div>
+        <div class="stat-value" id="stat-participants">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-chip stat-chip-success">✓</div>
+        <div class="stat-label">US votadas</div>
+        <div class="stat-value" id="stat-voted">0 / 0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-chip stat-chip-blue">⏱</div>
+        <div class="stat-label">Tempo de sessão</div>
+        <div class="stat-value" id="stat-time">0 min</div>
+      </div>
+    </div>
+
     <div class="room-grid">
       <aside class="stories-side">
         <div class="stories-head">
@@ -585,7 +618,7 @@ let roomRef = null;
 
 const hostState = {
   roomName:'', scaleKey:'fibonacci', stories:[], currentIndex:-1, adoBase:'',
-  votingOpen:false, revealed:false, participants:[], finalEstimates:{}, roomId:'', voteHistory:{}
+  votingOpen:false, revealed:false, participants:[], finalEstimates:{}, roomId:'', voteHistory:{}, roomStartedAt:null
 };
 
 function selectScale(key){
@@ -614,6 +647,7 @@ function createRoom(){
   hostState.revealed = false;
   hostState.participants = [];
   hostState.finalEstimates = {};
+  hostState.roomStartedAt = Date.now();
 
   document.getElementById('btn-create-room').disabled = true;
   document.getElementById('btn-create-room').textContent = 'Criando sala…';
@@ -810,7 +844,7 @@ function startNewRoom(){
   hostState.roomName = ''; hostState.scaleKey = 'fibonacci'; hostState.stories = [];
   hostState.adoBase = ''; hostState.voteHistory = {};
   hostState.currentIndex = -1; hostState.votingOpen = false; hostState.revealed = false;
-  hostState.participants = []; hostState.finalEstimates = {}; hostState.roomId = '';
+  hostState.participants = []; hostState.finalEstimates = {}; hostState.roomId = ''; hostState.roomStartedAt = null;
   lastState = null; lastParticipants = []; myVote = null; devName = ''; targetRoomId = ''; myParticipantId = null;
 
   document.getElementById('input-room-name').value = '';
@@ -832,7 +866,24 @@ function copyShareLink(){
 }
 
 /* ---------- SM rendering ---------- */
+function updateStatsCards(){
+  const elP = document.getElementById('stat-participants');
+  const elV = document.getElementById('stat-voted');
+  const elT = document.getElementById('stat-time');
+  if(!elP) return;
+  elP.textContent = hostState.participants.length;
+  elV.textContent = Object.keys(hostState.voteHistory).length + ' / ' + hostState.stories.length;
+  if(hostState.roomStartedAt){
+    const mins = Math.max(0, Math.round((Date.now() - hostState.roomStartedAt) / 60000));
+    elT.textContent = mins + ' min';
+  } else {
+    elT.textContent = '0 min';
+  }
+}
+setInterval(updateStatsCards, 30000);
+
 function renderSmRoom(){
+  updateStatsCards();
   // sidebar stories
   const list = document.getElementById('stories-list');
   list.innerHTML = hostState.stories.map((s,i)=>{
